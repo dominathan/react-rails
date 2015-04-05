@@ -4,13 +4,26 @@ var BlabsView = require('../blabs/View.jsx');
 var Menu = require('./Menu.jsx');
 var Router = require('react-router');
 var RouteHandler = Router.RouteHandler;
+var Uri = require('jsuri')
 
 module.exports = React.createClass({
   getDefaultProps: function() {
     return { origin: process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : ''};
   },
   getInitialState: function() {
-    return {showMenu: false};
+    return {showMenu: false, signedIn: false, current_user: {handle: ''} };
+  },
+  componentWillMount: function() {
+    var jwt = new Uri(location.search).getQueryParamValue('jwt');
+    if (!!jwt) {sessionStorage.setItem('jwt', jwt);}
+  },
+  componentDidMount: function() {
+    if (!!sessionStorage.getItem('jwt')) {this.currentUserFromAPI();}
+  },
+  currentUserFromAPI: function() {
+    this.readFromAPI(this.props.origin + '/current_user', function(user) {
+      this.setState({signedIn: true, currentUser: user});
+    }.bind(this));
   },
   handleMenuClick: function() {
     this.setState({showMenu: !this.state.showMenu});
@@ -21,6 +34,7 @@ module.exports = React.createClass({
       type: 'json',
       method: 'get',
       contentType: 'application/json',
+      headers: { "Authorization": sessionStorage.getItem('jwt')},
       success: successFunction,
       error: function(error) {
         console.log(url, error['response']);
@@ -29,11 +43,12 @@ module.exports = React.createClass({
     });
   },
   render: function() {
+    var menu = this.state.showMenu ? 'show-menu' : 'hide-menu';
     return (
-      <div id="app" className={Menu}>
-        <Menu sendMenuClick={this.handleMenuClick} />
+      <div id="app" className={menu}>
+        <Menu origin={this.props.origin} sendMenuClick={this.handleMenuClick} signedIn={this.state.signedIn} />
         <div id="content">
-          <RouteHandler origin={this.props.origin} readFromAPI={this.readFromAPI} />
+          <RouteHandler origin={this.props.origin} readFromAPI={this.readFromAPI} writeToAPI={this.writeToAPI} currentUser = {this.state.currentUser} signedIn={this.state.signedIn} />
         </div>
       </div>
     );
